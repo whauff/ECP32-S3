@@ -25,7 +25,32 @@ static void board_ui_task(void *arg)
 {
     (void)arg;
 
+    static bool is_low_power = false;
+    static bool last_btn_state = true;
+    static uint32_t ms_count = 0;
+
     while (1) {
+        // 1. 先轮询检测 BOOT 按键状态并进行模式切换，保证模式切换发生在所有状态读取和UI更新之前
+        bool current_btn_state = (gpio_get_level(BOOT_BUTTON_PIN) == 0);
+        bool mode_changed = false;
+        if (current_btn_state && last_btn_state) {
+            // 第一次检测到按下，执行防抖
+            vTaskDelay(pdMS_TO_TICKS(50));
+            if (gpio_get_level(BOOT_BUTTON_PIN) == 0) {
+                is_low_power = !is_low_power;
+                mode_changed = true;
+                ESP_LOGI(TAG, "检测到 BOOT 按键按下！手动切换至：%s功耗模式", is_low_power ? "低" : "高");
+                if (is_low_power) {
+                    wifi_time_sync_power_save();
+                } else {
+                    wifi_time_sync_start_wifi();
+                }
+            }
+        }
+        // 只有当按键释放（高电平）后，才允许下一次触发
+        last_btn_state = !current_btn_state;
+
+        // 2. 读取各硬件外设和网络状态
         rtc_bsp_datetime_t rtc_time = {0};
         shtc3_bsp_reading_t climate = {0};
         wifi_time_sync_status_t time_sync = {0};
@@ -55,35 +80,31 @@ static void board_ui_task(void *arg)
             state.ntp_synced = time_sync.time_synced ? 1 : 0;
         }
 
-        static bool is_low_power = false;
-        static bool last_btn_state = true;
-        static uint32_t ms_count = 0;
-
-        // 轮询检测 BOOT 按键状态（按下为低电平 0）
-        bool current_btn_state = (gpio_get_level(BOOT_BUTTON_PIN) == 0);
-        bool mode_changed = false;
-        if (current_btn_state && last_btn_state) {
-            // 第一次检测到按下，执行防抖
-            vTaskDelay(pdMS_TO_TICKS(50));
-            if (gpio_get_level(BOOT_BUTTON_PIN) == 0) {
-                is_low_power = !is_low_power;
+        // 2.5 自动静默保护逻辑：高功耗下如果 30 分钟无网络交互，自动退回低功耗模式以省电
+        if (!is_low_power) {
+            uint32_t current_ms = pdTICKS_TO_MS(xTaskGetTickCount());
+            uint32_t last_activity_ms = wifi_time_sync_get_last_activity_ms();
+            uint32_t inactive_ms = current_ms - last_activity_ms;
+            if (inactive_ms >= 30 * 60 * 1000) { // 30 分钟 = 1,800,000 毫秒
+                is_low_power = true;
                 mode_changed = true;
-                ESP_LOGI(TAG, "检测到 BOOT 按键按下！手动切换至：%s功耗模式", is_low_power ? "低" : "高");
-                if (is_low_power) {
-                    wifi_time_sync_power_save();
-                } else {
-                    wifi_time_sync_start_wifi();
-                }
+                ESP_LOGI(TAG, "高功耗模式已满 30 分钟无交互 (已静默: %" PRIu32 " ms)，自动进入低功耗模式...", inactive_ms);
+                wifi_time_sync_power_save();
             }
         }
-        // 只有当按键释放（高电平）后，才允许下一次触发
-        last_btn_state = !current_btn_state;
+
+        // 3. 强行覆盖：当处于低功耗模式下，Wi-Fi 实际上已被彻底关闭
+        // 强制设置 state 状态为未连接/未配置，避免由于异步关闭导致 UI 滞后卡在 OK 上
+        if (is_low_power) {
+            state.wifi_configured = 0;
+            state.wifi_connected = 0;
+        }
 
         state.low_power_mode = is_low_power ? 1 : 0;
 
         static uint32_t refresh_count = 0;
 
-        // 决定是否刷新显示：
+        // 4. 决定是否刷新显示：
         // 低功耗模式下只有在 60 秒到期，或者发生模式切换瞬间才刷新；
         // 高功耗模式下则通过计数器保持在 1 秒（1000毫秒）刷新一次。
         bool should_refresh = false;

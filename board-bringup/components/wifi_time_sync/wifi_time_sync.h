@@ -22,6 +22,10 @@ esp_err_t wifi_time_sync_get_status(wifi_time_sync_status_t *out_status);
 void wifi_time_sync_power_save(void);
 void wifi_time_sync_start_wifi(void);
 
+void wifi_time_sync_record_activity(void);
+uint32_t wifi_time_sync_get_last_activity_ms(void);
+
 #ifdef __cplusplus
 }
 #endif
+

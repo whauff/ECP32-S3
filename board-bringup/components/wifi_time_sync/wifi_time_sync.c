@@ -85,11 +85,13 @@ static void url_decode(char *dst, const char *src) {
 }
 
 static esp_err_t get_handler(httpd_req_t *req) {
+    wifi_time_sync_record_activity();
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, index_html, HTTPD_RESP_USE_STRLEN);
 }
 
 static esp_err_t post_handler(httpd_req_t *req) {
+    wifi_time_sync_record_activity();
     char buf[256];
     int ret, remaining = req->content_len;
     
@@ -271,6 +273,7 @@ static esp_err_t wifi_time_sync_write_back_rtc(void)
 static void wifi_time_sync_on_ntp(struct timeval *tv)
 {
     (void)tv;
+    wifi_time_sync_record_activity();
     if (wifi_time_sync_write_back_rtc() == ESP_OK) {
         s_status.time_synced = true;
     }
@@ -327,6 +330,7 @@ static void wifi_time_sync_event_handler(void *arg,
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        wifi_time_sync_record_activity();
         s_status.wifi_connected = true;
         s_status.retry_count = 0;
         s_status.wifi_config_mode = false;
@@ -353,6 +357,7 @@ esp_err_t wifi_time_sync_init(void)
         return ESP_OK;
     }
 
+    wifi_time_sync_record_activity();
     memset(&s_status, 0, sizeof(s_status));
     ESP_RETURN_ON_ERROR(wifi_time_sync_init_nvs(), TAG, "NVS 初始化失败");
     ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif 初始化失败");
@@ -434,6 +439,11 @@ esp_err_t wifi_time_sync_get_status(wifi_time_sync_status_t *out_status)
 
 void wifi_time_sync_power_save(void)
 {
+    if (s_sntp_started) {
+        esp_netif_sntp_deinit();
+        s_sntp_started = false;
+        ESP_LOGI(TAG, "SNTP 客户端已注销");
+    }
     esp_wifi_stop();
     s_status.wifi_connected = false;
     s_status.wifi_configured = false;
@@ -446,6 +456,7 @@ void wifi_time_sync_start_wifi(void)
     if (!s_initialized) {
         return;
     }
+    wifi_time_sync_record_activity();
     char ssid[64] = {0};
     char pswd[64] = {0};
     bool has_nvs = wifi_time_sync_read_nvs(ssid, pswd);
@@ -473,4 +484,17 @@ void wifi_time_sync_start_wifi(void)
     } else {
         wifi_time_sync_start_ap_portal();
     }
+}
+
+static uint32_t s_last_activity_ms = 0;
+
+void wifi_time_sync_record_activity(void)
+{
+    s_last_activity_ms = pdTICKS_TO_MS(xTaskGetTickCount());
+    ESP_LOGI(TAG, "记录到网络活动时间戳: %" PRIu32 " ms", s_last_activity_ms);
+}
+
+uint32_t wifi_time_sync_get_last_activity_ms(void)
+{
+    return s_last_activity_ms;
 }
