@@ -42,8 +42,8 @@ void ui_home_init(void)
     lv_obj_align(s_time_label, LV_ALIGN_CENTER, 0, -38);
 
     lv_obj_t *status_card = lv_obj_create(screen);
-    lv_obj_set_size(status_card, 336, 128);
-    lv_obj_align(status_card, LV_ALIGN_CENTER, 0, 86);
+    lv_obj_set_size(status_card, 336, 110);
+    lv_obj_align(status_card, LV_ALIGN_CENTER, 0, 50);
     lv_obj_set_style_radius(status_card, 0, 0);
     lv_obj_set_style_bg_color(status_card, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(status_card, LV_OPA_COVER, 0);
@@ -61,13 +61,13 @@ void ui_home_init(void)
     s_metrics_label = lv_label_create(status_card);
     lv_label_set_text(s_metrics_label, "TEMP --.- C\nHUM  --.- %RH\nVBAT -.-- V");
     lv_obj_set_style_text_font(s_metrics_label, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_line_space(s_metrics_label, 8, 0);
-    lv_obj_align(s_metrics_label, LV_ALIGN_TOP_LEFT, 14, 42);
+    lv_obj_set_style_text_line_space(s_metrics_label, 4, 0);
+    lv_obj_align(s_metrics_label, LV_ALIGN_TOP_LEFT, 14, 38);
 
     s_desc_label = lv_label_create(screen);
     lv_label_set_text(s_desc_label, "WAITING FOR DATA");
     lv_obj_set_style_text_font(s_desc_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(s_desc_label, LV_ALIGN_BOTTOM_MID, 0, -18);
+    lv_obj_align(s_desc_label, LV_ALIGN_BOTTOM_MID, 0, -10);
 }
 
 void ui_home_update(const ui_home_state_t *state)
