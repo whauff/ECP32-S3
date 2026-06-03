@@ -17,7 +17,9 @@ typedef struct {
     int climate_valid;
     int wifi_configured;
     int wifi_connected;
+    int wifi_config_mode;
     int ntp_synced;
+    int low_power_mode;
 } ui_home_state_t;
 
 void ui_home_init(void);

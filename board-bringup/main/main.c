@@ -5,6 +5,7 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_log.h"
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl_port.h"
@@ -47,15 +48,44 @@ static void board_ui_task(void *arg)
         if (wifi_time_sync_get_status(&time_sync) == ESP_OK) {
             state.wifi_configured = time_sync.wifi_configured ? 1 : 0;
             state.wifi_connected = time_sync.wifi_connected ? 1 : 0;
+            state.wifi_config_mode = time_sync.wifi_config_mode ? 1 : 0;
             state.ntp_synced = time_sync.time_synced ? 1 : 0;
         }
+
+        static uint32_t active_sec_count = 0;
+        static bool enter_power_save = false;
+
+        if (time_sync.time_synced && !time_sync.wifi_config_mode) {
+            if (!enter_power_save) {
+                active_sec_count++;
+                if (active_sec_count >= 10) {
+                    ESP_LOGI(TAG, "NTP校时成功已达10秒，启动超低功耗休眠走时模式...");
+                    wifi_time_sync_power_save();
+                    enter_power_save = true;
+                }
+            }
+        } else {
+            active_sec_count = 0;
+            enter_power_save = false;
+        }
+
+        state.low_power_mode = enter_power_save ? 1 : 0;
 
         if (lvgl_port_lock(100)) {
             ui_home_update(&state);
             lvgl_port_unlock();
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (enter_power_save) {
+            // 配置轻度睡眠定时唤醒源为 60 秒 (60,000,000 微秒)
+            esp_sleep_enable_timer_wakeup(60 * 1000000ULL);
+            vTaskDelay(pdMS_TO_TICKS(20)); // 给串口留出刷新日志的时间
+            ESP_LOGI(TAG, "系统进入 Light Sleep... (60秒后自动唤醒)");
+            esp_light_sleep_start();
+            ESP_LOGI(TAG, "从 Light Sleep 中唤醒，刷新数据...");
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
 }
 

@@ -42,7 +42,7 @@ void ui_home_init(void)
     lv_obj_align(s_time_label, LV_ALIGN_CENTER, 0, -38);
 
     lv_obj_t *status_card = lv_obj_create(screen);
-    lv_obj_set_size(status_card, 336, 110);
+    lv_obj_set_size(status_card, 336, 115);
     lv_obj_align(status_card, LV_ALIGN_CENTER, 0, 50);
     lv_obj_set_style_radius(status_card, 0, 0);
     lv_obj_set_style_bg_color(status_card, lv_color_hex(0xFFFFFF), 0);
@@ -50,7 +50,7 @@ void ui_home_init(void)
     lv_obj_set_style_border_color(status_card, lv_color_hex(0x000000), 0);
     lv_obj_set_style_border_width(status_card, 2, 0);
     lv_obj_set_style_shadow_width(status_card, 0, 0);
-    lv_obj_set_style_pad_all(status_card, 12, 0);
+    lv_obj_set_style_pad_all(status_card, 8, 0);
     lv_obj_clear_flag(status_card, LV_OBJ_FLAG_SCROLLABLE);
 
     s_status_label = lv_label_create(status_card);
@@ -88,7 +88,11 @@ void ui_home_update(const ui_home_state_t *state)
     } else {
         snprintf(date_text, sizeof(date_text), "----.--.--");
     }
-    snprintf(time_text, sizeof(time_text), "%02u:%02u:%02u", state->hour, state->minute, state->second);
+    if (state->low_power_mode) {
+        snprintf(time_text, sizeof(time_text), "%02u:%02u", state->hour, state->minute);
+    } else {
+        snprintf(time_text, sizeof(time_text), "%02u:%02u:%02u", state->hour, state->minute, state->second);
+    }
     snprintf(battery_text, sizeof(battery_text), "BAT %3u%%", state->battery_percent);
     if (state->climate_valid) {
         snprintf(metrics_text, sizeof(metrics_text), "TEMP %.1f C\nHUM  %.1f %%RH\nVBAT %.2f V",
@@ -99,10 +103,14 @@ void ui_home_update(const ui_home_state_t *state)
         snprintf(metrics_text, sizeof(metrics_text), "TEMP --.- C\nHUM  --.- %%RH\nVBAT %.2f V",
                  state->battery_voltage);
     }
-    snprintf(desc_text, sizeof(desc_text), "RTC: %s | WIFI: %s | NTP: %s",
-             state->rtc_valid ? "OK" : "ERR",
-             state->wifi_configured ? (state->wifi_connected ? "OK" : "WAIT") : "OFF",
-             state->ntp_synced ? "OK" : "WAIT");
+    if (state->wifi_config_mode) {
+        snprintf(desc_text, sizeof(desc_text), "WIFI: CFG | AP: ECP32-S3-Config");
+    } else {
+        snprintf(desc_text, sizeof(desc_text), "RTC: %s | WIFI: %s | NTP: %s",
+                 state->rtc_valid ? "OK" : "ERR",
+                 state->wifi_configured ? (state->wifi_connected ? "OK" : "WAIT") : "OFF",
+                 state->ntp_synced ? "OK" : "WAIT");
+    }
 
     lv_label_set_text(s_date_label, date_text);
     lv_label_set_text(s_time_label, time_text);
