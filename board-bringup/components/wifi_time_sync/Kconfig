@@ -1,0 +1,34 @@
+menu "联网校时配置"
+
+config BOARD_WIFI_SSID
+    string "Wi-Fi SSID"
+    default ""
+    help
+        用于联网校时的 Wi-Fi 名称。留空时将跳过联网与 NTP。
+
+config BOARD_WIFI_PASSWORD
+    string "Wi-Fi 密码"
+    default ""
+    help
+        用于联网校时的 Wi-Fi 密码。若网络无密码，可保持为空。
+
+config BOARD_WIFI_MAXIMUM_RETRY
+    int "Wi-Fi 最大重试次数"
+    range 1 20
+    default 8
+    help
+        连接失败后的最大重试次数。
+
+config BOARD_NTP_SERVER
+    string "NTP 服务器"
+    default "ntp.aliyun.com"
+    help
+        首选 NTP 时间服务器。
+
+config BOARD_TIMEZONE
+    string "设备时区"
+    default "CST-8"
+    help
+        设备本地时区，默认中国标准时间。
+
+endmenu
