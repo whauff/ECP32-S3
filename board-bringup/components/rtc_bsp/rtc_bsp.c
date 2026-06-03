@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "driver/i2c_master.h"
 #include "esp_check.h"
@@ -176,6 +178,25 @@ esp_err_t rtc_bsp_init(void)
     if (err == ESP_OK && dt.valid) {
         ESP_LOGI(TAG, "RTC 已就绪，当前时间 %04u-%02u-%02u %02u:%02u:%02u",
                  dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+        
+        // 同步至系统时间
+        struct tm tm_time = {
+            .tm_year = dt.year - 1900,
+            .tm_mon = dt.month - 1,
+            .tm_mday = dt.day,
+            .tm_hour = dt.hour,
+            .tm_min = dt.minute,
+            .tm_sec = dt.second,
+            .tm_isdst = -1
+        };
+        time_t t = mktime(&tm_time);
+        if (t != (time_t)-1) {
+            struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
+            settimeofday(&tv, NULL);
+            setenv("TZ", CONFIG_BOARD_TIMEZONE, 1);
+            tzset();
+            ESP_LOGI(TAG, "系统时间已同步为 RTC 时间");
+        }
     } else {
         rtc_bsp_datetime_t fallback = {0};
         if (rtc_bsp_parse_build_datetime(&fallback)) {
@@ -183,6 +204,25 @@ esp_err_t rtc_bsp_init(void)
                      fallback.year, fallback.month, fallback.day,
                      fallback.hour, fallback.minute, fallback.second);
             ESP_RETURN_ON_ERROR(rtc_bsp_set_datetime(&fallback), TAG, "RTC 回写编译时间失败");
+            
+            // 同步至系统时间
+            struct tm tm_time = {
+                .tm_year = fallback.year - 1900,
+                .tm_mon = fallback.month - 1,
+                .tm_mday = fallback.day,
+                .tm_hour = fallback.hour,
+                .tm_min = fallback.minute,
+                .tm_sec = fallback.second,
+                .tm_isdst = -1
+            };
+            time_t t = mktime(&tm_time);
+            if (t != (time_t)-1) {
+                struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
+                settimeofday(&tv, NULL);
+                setenv("TZ", CONFIG_BOARD_TIMEZONE, 1);
+                tzset();
+                ESP_LOGI(TAG, "系统时间已同步为编译兜底时间");
+            }
         } else {
             ESP_LOGW(TAG, "RTC 时间无效，且编译时间解析失败");
         }
