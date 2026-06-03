@@ -64,10 +64,10 @@ void ui_home_init(void)
     lv_obj_set_style_text_line_space(s_metrics_label, 8, 0);
     lv_obj_align(s_metrics_label, LV_ALIGN_TOP_LEFT, 14, 42);
 
-    s_desc_label = lv_label_create(status_card);
-    lv_label_set_text(s_desc_label, "等待硬件数据");
-    lv_obj_set_style_text_font(s_desc_label, &lv_font_montserrat_16, 0);
-    lv_obj_align(s_desc_label, LV_ALIGN_BOTTOM_LEFT, 14, -8);
+    s_desc_label = lv_label_create(screen);
+    lv_label_set_text(s_desc_label, "WAITING FOR DATA");
+    lv_obj_set_style_text_font(s_desc_label, &lv_font_montserrat_14, 0);
+    lv_obj_align(s_desc_label, LV_ALIGN_BOTTOM_MID, 0, -18);
 }
 
 void ui_home_update(const ui_home_state_t *state)
@@ -99,10 +99,10 @@ void ui_home_update(const ui_home_state_t *state)
         snprintf(metrics_text, sizeof(metrics_text), "TEMP --.- C\nHUM  --.- %%RH\nVBAT %.2f V",
                  state->battery_voltage);
     }
-    snprintf(desc_text, sizeof(desc_text), "RTC %s | WIFI %s | NTP %s",
-             state->rtc_valid ? "正常" : "回退",
-             state->wifi_configured ? (state->wifi_connected ? "在线" : "等待") : "未配",
-             state->ntp_synced ? "已校时" : "未校时");
+    snprintf(desc_text, sizeof(desc_text), "RTC: %s | WIFI: %s | NTP: %s",
+             state->rtc_valid ? "OK" : "ERR",
+             state->wifi_configured ? (state->wifi_connected ? "OK" : "WAIT") : "OFF",
+             state->ntp_synced ? "OK" : "WAIT");
 
     lv_label_set_text(s_date_label, date_text);
     lv_label_set_text(s_time_label, time_text);
