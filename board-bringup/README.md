@@ -17,6 +17,12 @@
 - `Wi‑Fi + NTP + RTC 回写`
 - 失败兜底的 `AP + 网页配网`
 
+当前依赖策略：
+
+- `LVGL` 通过 `ESP-IDF Component Manager` 管理
+- 首次构建时会自动下载到 `managed_components/`
+- `managed_components/` 不再作为仓库源码提交
+
 ## 当前行为
 
 ### 1. 启动后的联网策略
@@ -97,7 +103,7 @@ export ECP32_S3_SUPPORT_ROOT=/你的支持目录
 ```bash
 . /Users/yang/Code/ECP32-S3/scripts/idf-env.sh
 cd /Users/yang/Code/ECP32-S3/board-bringup
-IDF_COMPONENT_MANAGER=0 idf.py build
+idf.py build
 ```
 
 烧录并查看串口：
@@ -105,7 +111,7 @@ IDF_COMPONENT_MANAGER=0 idf.py build
 ```bash
 . /Users/yang/Code/ECP32-S3/scripts/idf-env.sh
 cd /Users/yang/Code/ECP32-S3/board-bringup
-IDF_COMPONENT_MANAGER=0 idf.py -p /dev/cu.usbmodem1101 flash monitor
+idf.py -p /dev/cu.usbmodem1101 flash monitor
 ```
 
 彻底清理后重编：
@@ -113,9 +119,15 @@ IDF_COMPONENT_MANAGER=0 idf.py -p /dev/cu.usbmodem1101 flash monitor
 ```bash
 . /Users/yang/Code/ECP32-S3/scripts/idf-env.sh
 cd /Users/yang/Code/ECP32-S3/board-bringup
-IDF_COMPONENT_MANAGER=0 idf.py fullclean
-IDF_COMPONENT_MANAGER=0 idf.py build
+idf.py fullclean
+idf.py build
 ```
+
+首次构建时如果本地还没有拉过依赖：
+
+- `idf.py build` 会自动下载 `LVGL`
+- 下载结果位于 `board-bringup/managed_components/`
+- 这是本地依赖缓存，不会提交到 Git
 
 ## 已完成验证
 

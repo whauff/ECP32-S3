@@ -1,6 +1,7 @@
 .DS_Store
 
 board-bringup/build/
+board-bringup/managed_components/
 board-bringup/sdkconfig
 board-bringup/.DS_Store
 

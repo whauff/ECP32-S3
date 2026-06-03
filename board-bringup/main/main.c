@@ -15,6 +15,9 @@
 #include "shtc3_bsp.h"
 #include "ui_home.h"
 #include "wifi_time_sync.h"
+#include "driver/gpio.h"
+
+#define BOOT_BUTTON_PIN GPIO_NUM_0
 
 static const char *TAG = "board_bringup";
 
@@ -52,39 +55,62 @@ static void board_ui_task(void *arg)
             state.ntp_synced = time_sync.time_synced ? 1 : 0;
         }
 
-        static uint32_t active_sec_count = 0;
-        static bool enter_power_save = false;
+        static bool is_low_power = false;
+        static bool last_btn_state = true;
+        static uint32_t ms_count = 0;
 
-        if (time_sync.time_synced && !time_sync.wifi_config_mode) {
-            if (!enter_power_save) {
-                active_sec_count++;
-                if (active_sec_count >= 10) {
-                    ESP_LOGI(TAG, "NTP校时成功已达10秒，启动超低功耗休眠走时模式...");
+        // 轮询检测 BOOT 按键状态（按下为低电平 0）
+        bool current_btn_state = (gpio_get_level(BOOT_BUTTON_PIN) == 0);
+        bool mode_changed = false;
+        if (current_btn_state && last_btn_state) {
+            // 第一次检测到按下，执行防抖
+            vTaskDelay(pdMS_TO_TICKS(50));
+            if (gpio_get_level(BOOT_BUTTON_PIN) == 0) {
+                is_low_power = !is_low_power;
+                mode_changed = true;
+                ESP_LOGI(TAG, "检测到 BOOT 按键按下！手动切换至：%s功耗模式", is_low_power ? "低" : "高");
+                if (is_low_power) {
                     wifi_time_sync_power_save();
-                    enter_power_save = true;
+                } else {
+                    wifi_time_sync_start_wifi();
                 }
             }
+        }
+        // 只有当按键释放（高电平）后，才允许下一次触发
+        last_btn_state = !current_btn_state;
+
+        state.low_power_mode = is_low_power ? 1 : 0;
+
+        static uint32_t refresh_count = 0;
+
+        // 决定是否刷新显示：
+        // 低功耗模式下只有在 60 秒到期，或者发生模式切换瞬间才刷新；
+        // 高功耗模式下则通过计数器保持在 1 秒（1000毫秒）刷新一次。
+        bool should_refresh = false;
+        if (is_low_power) {
+            ms_count += 100;
+            if (ms_count >= 60000 || mode_changed) {
+                ms_count = 0;
+                should_refresh = true;
+            }
         } else {
-            active_sec_count = 0;
-            enter_power_save = false;
+            refresh_count += 100;
+            if (refresh_count >= 1000 || mode_changed) {
+                refresh_count = 0;
+                should_refresh = true;
+            }
         }
 
-        state.low_power_mode = enter_power_save ? 1 : 0;
-
-        if (lvgl_port_lock(100)) {
-            ui_home_update(&state);
-            lvgl_port_unlock();
+        if (should_refresh) {
+            if (lvgl_port_lock(100)) {
+                ui_home_update(&state);
+                lvgl_port_unlock();
+            }
         }
 
-        if (enter_power_save) {
-            // 为避免带 PSRAM 的 ESP32-S3 在 Light Sleep 期间由于内存自刷新和时钟源关断引起死锁，
-            // 这里我们采用最稳妥、可交付的“关闭 Wi-Fi 射频 + 60 秒 RTOS 延时”的超低功耗走时模式。
-            // 此时 Wi-Fi 射频（最大的功耗大户）已被彻底 stop，功耗已下降 85% 以上，且屏幕和系统 100% 稳定。
-            ESP_LOGI(TAG, "系统处于低功耗模式，等待60秒后自动刷新数据...");
-            vTaskDelay(pdMS_TO_TICKS(60 * 1000));
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
+        // 统一在主循环底部使用 100ms 快速轮询
+        // 这样无论处于高功耗还是低功耗模式，短按按键都能在 100ms 内灵敏捕获！
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -112,6 +138,16 @@ void app_main(void)
              chip_info.cores,
              chip_info.revision,
              flash_size / (1024 * 1024));
+
+    // 初始化 BOOT 自定义按键 (GPIO0)
+    gpio_config_t btn_conf = {
+        .pin_bit_mask = (1ULL << BOOT_BUTTON_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&btn_conf);
 
     rtc_err = rtc_bsp_init();
     if (rtc_err != ESP_OK) {

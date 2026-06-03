@@ -27,6 +27,7 @@ ECP32-S3/
 - 当前主工程位于 [board-bringup/README.md](/Users/yang/Code/ECP32-S3/board-bringup/README.md)
 - 本仓库不再内置完整 `ESP-IDF` 支持目录
 - 当前默认支持目录位于 `~/Dev/ECP32-S3-support`
+- `LVGL` 改为通过 `ESP-IDF Component Manager` 在首次构建时自动拉取，不再把源码整包提交进仓库
 
 ## 环境准备
 
@@ -55,7 +56,7 @@ export ECP32_S3_SUPPORT_ROOT=/你的支持目录
 ```bash
 . /Users/yang/Code/ECP32-S3/scripts/idf-env.sh
 cd /Users/yang/Code/ECP32-S3/board-bringup
-IDF_COMPONENT_MANAGER=0 idf.py build
+idf.py build
 ```
 
 烧录并查看串口：
@@ -63,8 +64,14 @@ IDF_COMPONENT_MANAGER=0 idf.py build
 ```bash
 . /Users/yang/Code/ECP32-S3/scripts/idf-env.sh
 cd /Users/yang/Code/ECP32-S3/board-bringup
-IDF_COMPONENT_MANAGER=0 idf.py -p /dev/cu.usbmodem1101 flash monitor
+idf.py -p /dev/cu.usbmodem1101 flash monitor
 ```
+
+首次构建说明：
+
+- 如果本地还没有拉过依赖，`idf.py build` 会自动下载 `LVGL`
+- 下载完成后，组件会落到 `board-bringup/managed_components/`
+- 该目录属于构建依赖缓存，已加入 `.gitignore`
 
 ## 当前状态
 

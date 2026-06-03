@@ -440,3 +440,37 @@ void wifi_time_sync_power_save(void)
     s_status.wifi_config_mode = false;
     ESP_LOGI(TAG, "已彻底关闭 Wi-Fi 射频以节省电能");
 }
+
+void wifi_time_sync_start_wifi(void)
+{
+    if (!s_initialized) {
+        return;
+    }
+    char ssid[64] = {0};
+    char pswd[64] = {0};
+    bool has_nvs = wifi_time_sync_read_nvs(ssid, pswd);
+
+    if (has_nvs && strlen(ssid) > 0) {
+        s_status.wifi_configured = true;
+    } else {
+        if (strlen(CONFIG_BOARD_WIFI_SSID) > 0) {
+            strncpy(ssid, CONFIG_BOARD_WIFI_SSID, sizeof(ssid) - 1);
+            strncpy(pswd, CONFIG_BOARD_WIFI_PASSWORD, sizeof(pswd) - 1);
+            s_status.wifi_configured = true;
+        }
+    }
+
+    if (s_status.wifi_configured) {
+        s_status.retry_count = 0;
+        s_status.time_synced = false; // 允许重新校时
+        esp_wifi_set_mode(WIFI_MODE_STA);
+        wifi_config_t wifi_config = {0};
+        strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
+        strncpy((char *)wifi_config.sta.password, pswd, sizeof(wifi_config.sta.password) - 1);
+        esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+        esp_wifi_start();
+        ESP_LOGI(TAG, "手动重新开启 Wi-Fi 射频，正在连接...");
+    } else {
+        wifi_time_sync_start_ap_portal();
+    }
+}

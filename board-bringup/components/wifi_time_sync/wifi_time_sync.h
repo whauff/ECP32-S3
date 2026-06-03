@@ -20,6 +20,7 @@ typedef struct {
 esp_err_t wifi_time_sync_init(void);
 esp_err_t wifi_time_sync_get_status(wifi_time_sync_status_t *out_status);
 void wifi_time_sync_power_save(void);
+void wifi_time_sync_start_wifi(void);
 
 #ifdef __cplusplus
 }
